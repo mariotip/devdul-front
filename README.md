@@ -54,6 +54,11 @@ Todas tienen un valor por defecto, así que el sitio compila aunque no las defin
 
 ```
 app/            Rutas (página principal, 404, robots, sitemap, icono)
-components/     Header y Footer
+components/     Header, Hero, secciones de la landing y UI compartida
 lib/site.ts     Configuración del sitio (nombre, URL, correo)
 ```
+
+La landing incluye hero con mockup de producto, logos de confianza, servicios,
+stack tecnológico, proyectos, proceso de trabajo, testimonios y CTA de contacto.
+Todo el arte visual (mockups, tarjetas, iconos) está hecho con CSS y SVG: no hay
+imágenes externas ni dependencias de UI adicionales.
