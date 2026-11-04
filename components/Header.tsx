@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
+import { Logo } from "./Logo";
 
 const links = [
   { href: "#servicios", id: "servicios", label: "Servicios" },
@@ -42,14 +42,7 @@ export function Header() {
     <header className="sticky top-0 z-50 bg-gradient-to-b from-night via-night/85 to-transparent pb-4 pt-3">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="relative flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#070f1e]/80 px-4 py-2.5 shadow-[0_20px_60px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:px-5">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="DevDul, inicio">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-700 text-[17px] font-bold leading-none text-white shadow-[0_0_28px_-4px_rgba(43,123,255,0.7)]">
-              D
-            </span>
-            <span className="text-lg font-semibold tracking-tight text-white">
-              Dev<span className="text-brand-400">Dul</span>
-            </span>
-          </Link>
+          <Logo />
 
           <nav className="hidden items-center gap-7 md:flex" aria-label="Navegación principal">
             {links.map((link) => {

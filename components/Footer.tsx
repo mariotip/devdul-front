@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { siteConfig } from "@/lib/site";
 import { Icon } from "./Icon";
+import { Logo } from "./Logo";
 
 const nav = [
   { href: "#servicios", label: "Servicios" },
@@ -24,14 +24,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-6 py-16 lg:px-10">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.1fr]">
           <div>
-            <Link href="/" className="flex items-center gap-2.5" aria-label="DevDul, inicio">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-700 text-[17px] font-bold leading-none text-white shadow-[0_0_28px_-4px_rgba(43,123,255,0.7)]">
-                D
-              </span>
-              <span className="text-lg font-semibold tracking-tight text-white">
-                Dev<span className="text-brand-400">Dul</span>
-              </span>
-            </Link>
+            <Logo />
             <p className="mt-4 max-w-xs text-sm leading-6 text-slate-500">
               Convertimos procesos complejos en productos digitales claros, útiles y listos para crecer.
             </p>
