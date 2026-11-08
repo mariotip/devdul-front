@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent, type InputHTMLAttributes 
 import {
   catalog as fallbackCatalog,
   DEFAULT_HOURLY_RATE_MXN,
+  DEFAULT_IVA_RATE,
   type QuoteCategory,
 } from "@/lib/quote-catalog";
 import { siteConfig } from "@/lib/site";
@@ -25,6 +26,7 @@ type Status = { state: "idle" } | { state: "sending" } | { state: "sent"; id: nu
 export function Quote() {
   const [categories, setCategories] = useState<QuoteCategory[]>(fallbackCatalog);
   const [rate, setRate] = useState(DEFAULT_HOURLY_RATE_MXN);
+  const [ivaRate, setIvaRate] = useState(DEFAULT_IVA_RATE);
   const [open, setOpen] = useState<QuoteCategory["id"] | null>("crm");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
@@ -34,9 +36,10 @@ export function Quote() {
     const controller = new AbortController();
     fetch(`${siteConfig.apiUrl}/quote/catalog`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then((data: { hourlyRate: number; categories: QuoteCategory[] }) => {
+      .then((data: { hourlyRate: number; ivaRate?: number; categories: QuoteCategory[] }) => {
         if (Array.isArray(data.categories) && data.categories.length) setCategories(data.categories);
         if (data.hourlyRate > 0) setRate(data.hourlyRate);
+        if (typeof data.ivaRate === "number" && data.ivaRate >= 0 && data.ivaRate < 1) setIvaRate(data.ivaRate);
       })
       .catch(() => {
         // Sin API se usa el catálogo incluido en el sitio.
@@ -46,7 +49,8 @@ export function Quote() {
 
   const known = useMemo(() => new Set(categories.flatMap((c) => c.modules.map((m) => m.id))), [categories]);
   const ids = useMemo(() => [...selected].filter((id) => known.has(id)), [selected, known]);
-  const quote = useMemo(() => computeQuoteFor(categories, ids, rate), [categories, ids, rate]);
+  const ivaPercent = Math.round(ivaRate * 100);
+  const quote = useMemo(() => computeQuoteFor(categories, ids, rate, ivaRate), [categories, ids, rate, ivaRate]);
 
   const toggle = (id: string) =>
     setSelected((current) => {
@@ -98,7 +102,7 @@ export function Quote() {
   }
 
   const mailto = `mailto:${siteConfig.contactEmail}?subject=${encodeURIComponent("Cotización DevDul")}&body=${encodeURIComponent(
-    [...quote.items.map((i) => `- [${i.category.toUpperCase()}] ${i.name} (${i.hours} h)`), "", `Total estimado: ${mxn(quote.totalMxn)}`].join("\n"),
+    [...quote.items.map((i) => `- [${i.category.toUpperCase()}] ${i.name} (${i.hours} h)`), "", `Subtotal: ${mxn(quote.subtotalMxn)}`, `IVA (${ivaPercent}%): ${mxn(quote.ivaMxn)}`, `Total con IVA: ${mxn(quote.totalMxn)}`].join("\n"),
   )}`;
 
   return (
@@ -115,7 +119,7 @@ export function Quote() {
               Arma tu sistema <span className="text-brand-400">y conoce el precio.</span>
             </>
           }
-          description={`Elige el tipo de sistema, marca los módulos que necesitas y ve el costo estimado al momento. Calculamos las horas de cada módulo a ${mxn(rate)} por hora.`}
+          description={`Elige el tipo de sistema, marca los módulos que necesitas y ve el costo estimado al momento. Calculamos las horas de cada módulo a ${mxn(rate)} por hora más IVA.`}
         />
 
         <div className="mt-14 grid gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
@@ -222,9 +226,24 @@ export function Quote() {
               <p className="mt-4 text-4xl font-semibold tabular-nums tracking-[-0.04em] text-white" aria-live="polite">
                 {mxn(quote.totalMxn)}
               </p>
-              <p className="mt-1 text-sm text-slate-400">
-                {quote.totalHours} horas × {mxn(rate)} · MXN
-              </p>
+              <p className="mt-1 text-sm text-slate-400">Total con IVA · MXN</p>
+
+              <dl className="mt-5 space-y-1.5 rounded-2xl border border-white/[.08] bg-night/40 p-4 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-400">
+                    Subtotal <span className="text-slate-500">({quote.totalHours} h × {mxn(rate)})</span>
+                  </dt>
+                  <dd className="tabular-nums text-slate-200">{mxn(quote.subtotalMxn)}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-400">IVA {ivaPercent}%</dt>
+                  <dd className="tabular-nums text-slate-200">{mxn(quote.ivaMxn)}</dd>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-white/[.08] pt-1.5 font-semibold">
+                  <dt className="text-white">Total</dt>
+                  <dd className="tabular-nums text-white">{mxn(quote.totalMxn)}</dd>
+                </div>
+              </dl>
 
               {quote.items.length ? (
                 <ul className="mt-6 max-h-72 space-y-2 overflow-y-auto border-t border-white/[.08] pt-4 pr-1">
@@ -300,7 +319,7 @@ export function Quote() {
               ) : null}
 
               <p className="mt-5 text-[11px] leading-5 text-slate-500">
-                Precio estimado. El alcance y el precio final se confirman en una llamada de diagnóstico sin costo.
+                Los precios por módulo no incluyen IVA. Precio estimado: el alcance y el precio final se confirman en una llamada de diagnóstico sin costo.
               </p>
             </div>
           </aside>
@@ -317,7 +336,7 @@ export function Quote() {
           className="fixed inset-x-4 bottom-4 z-40 flex items-center justify-between rounded-2xl border border-brand-400/40 bg-[#070f1e]/95 px-5 py-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl lg:hidden"
         >
           <span className="text-xs text-slate-400">
-            {quote.items.length} módulos · {quote.totalHours} h
+            {quote.items.length} módulos · {quote.totalHours} h · con IVA
           </span>
           <span className="text-lg font-semibold tabular-nums text-white">{mxn(quote.totalMxn)}</span>
         </a>
@@ -326,7 +345,7 @@ export function Quote() {
   );
 }
 
-function computeQuoteFor(categories: QuoteCategory[], ids: string[], rate: number) {
+function computeQuoteFor(categories: QuoteCategory[], ids: string[], rate: number, ivaRate: number) {
   // Misma regla que el backend: el núcleo de una categoría entra cuando se elige algún módulo de ella.
   const byId = new Map(categories.flatMap((c) => c.modules.map((m) => [m.id, c.id] as const)));
   const active = new Set(ids.map((id) => byId.get(id)));
@@ -339,7 +358,9 @@ function computeQuoteFor(categories: QuoteCategory[], ids: string[], rate: numbe
         .map((m) => ({ id: m.id, category: c.id, name: m.name, hours: m.hours, amountMxn: m.hours * rate })),
     );
   const totalHours = items.reduce((sum, item) => sum + item.hours, 0);
-  return { items, totalHours, hourlyRate: rate, totalMxn: totalHours * rate };
+  const subtotalMxn = totalHours * rate;
+  const ivaMxn = Math.round(subtotalMxn * ivaRate);
+  return { items, totalHours, hourlyRate: rate, subtotalMxn, ivaRate, ivaMxn, totalMxn: subtotalMxn + ivaMxn };
 }
 
 function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {

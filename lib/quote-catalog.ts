@@ -93,7 +93,9 @@ export const catalog: QuoteCategory[] = [
   },
 ]
 
-export const DEFAULT_HOURLY_RATE_MXN = 500
+export const DEFAULT_HOURLY_RATE_MXN = 800
+/** IVA en México. */
+export const DEFAULT_IVA_RATE = 0.16
 
 const modulesById = new Map(
   catalog.flatMap((category) => category.modules.map((m) => [m.id, { ...m, category: category.id }] as const)),
@@ -105,6 +107,11 @@ export type QuoteResult = {
   items: QuoteLine[]
   totalHours: number
   hourlyRate: number
+  /** Horas × tarifa, sin IVA. */
+  subtotalMxn: number
+  ivaRate: number
+  ivaMxn: number
+  /** Subtotal + IVA. */
   totalMxn: number
 }
 
@@ -119,11 +126,19 @@ export function parseHourlyRate(value: string | undefined): number {
   return Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_HOURLY_RATE_MXN
 }
 
+/** Tasa de IVA como fracción (0.16). Acepta 0 para no cobrar IVA. */
+export function parseIvaRate(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_IVA_RATE
+  const rate = Number(value)
+  return Number.isFinite(rate) && rate >= 0 && rate < 1 ? rate : DEFAULT_IVA_RATE
+}
+
 /**
  * Calcula la cotización para los módulos elegidos. Agrega el núcleo de cada
- * categoría con al menos un módulo y descarta ids repetidos.
+ * categoría con al menos un módulo y descarta ids repetidos. Los montos por
+ * módulo y el subtotal van sin IVA; totalMxn ya lo incluye.
  */
-export function computeQuote(moduleIds: string[], hourlyRate: number): QuoteResult {
+export function computeQuote(moduleIds: string[], hourlyRate: number, ivaRate = DEFAULT_IVA_RATE): QuoteResult {
   const unknown = moduleIds.filter((id) => !modulesById.has(id))
   if (unknown.length) throw new UnknownModuleError([...new Set(unknown)])
 
@@ -147,5 +162,7 @@ export function computeQuote(moduleIds: string[], hourlyRate: number): QuoteResu
   }
 
   const totalHours = items.reduce((sum, item) => sum + item.hours, 0)
-  return { items, totalHours, hourlyRate, totalMxn: totalHours * hourlyRate }
+  const subtotalMxn = totalHours * hourlyRate
+  const ivaMxn = Math.round(subtotalMxn * ivaRate)
+  return { items, totalHours, hourlyRate, subtotalMxn, ivaRate, ivaMxn, totalMxn: subtotalMxn + ivaMxn }
 }
