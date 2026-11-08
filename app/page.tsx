@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { Process } from "@/components/Process";
 import { Projects } from "@/components/Projects";
+import { Quote } from "@/components/Quote";
 import { Services } from "@/components/Services";
 import { TechStack } from "@/components/TechStack";
 import { Testimonials } from "@/components/Testimonials";
@@ -17,6 +18,7 @@ export default function Home() {
         <Hero />
         <TrustedBy />
         <Services />
+        <Quote />
         <TechStack />
         <Projects />
         <Process />
