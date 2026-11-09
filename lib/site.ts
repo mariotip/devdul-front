@@ -4,9 +4,9 @@ export const siteConfig = {
   description:
     "Desarrollamos ERP, CRM y aplicaciones web y móviles a la medida, potenciadas con Inteligencia Artificial. Automatiza tu operación y haz crecer tu empresa con DevDul.",
   shortDescription: "ERP, CRM y apps a la medida con Inteligencia Artificial.",
-  // En producción define NEXT_PUBLIC_SITE_URL con el dominio real; el valor por defecto
-  // evita que las URLs de SEO y Open Graph apunten a localhost si falta la variable.
-  url: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://devdul.com").replace(/\/+$/, ""),
+  // URL pública absoluta: la usan WhatsApp/Facebook para descargar la imagen al compartir.
+  // Si tienes dominio propio, define NEXT_PUBLIC_SITE_URL; si no, se usa la URL de Cloudflare Pages.
+  url: (process.env.NEXT_PUBLIC_SITE_URL || "https://devdul-front.pages.dev").replace(/\/+$/, ""),
   locale: "es_MX",
   contactEmail: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "contacto@devdul.com",
   keywords: [
