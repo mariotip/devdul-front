@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type InputHTMLAttributes } from "react";
 import {
-  catalog as fallbackCatalog,
-  DEFAULT_HOURLY_RATE_MXN,
   DEFAULT_IVA_RATE,
+  fallbackCatalog,
   type QuoteCategory,
 } from "@/lib/quote-catalog";
 import { siteConfig } from "@/lib/site";
@@ -21,11 +20,13 @@ const accents: Record<QuoteCategory["id"], string> = {
 const mxn = (value: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(value);
 
+const price = (value: number | null) => (value === null ? "—" : mxn(value));
+
 type Status = { state: "idle" } | { state: "sending" } | { state: "sent"; id: number } | { state: "error"; message: string };
 
 export function Quote() {
   const [categories, setCategories] = useState<QuoteCategory[]>(fallbackCatalog);
-  const [rate, setRate] = useState(DEFAULT_HOURLY_RATE_MXN);
+  const [prices, setPrices] = useState<"loading" | "ready" | "error">("loading");
   const [ivaRate, setIvaRate] = useState(DEFAULT_IVA_RATE);
   const [open, setOpen] = useState<QuoteCategory["id"] | null>("crm");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -36,13 +37,15 @@ export function Quote() {
     const controller = new AbortController();
     fetch(`${siteConfig.apiUrl}/quote/catalog`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then((data: { hourlyRate: number; ivaRate?: number; categories: QuoteCategory[] }) => {
-        if (Array.isArray(data.categories) && data.categories.length) setCategories(data.categories);
-        if (data.hourlyRate > 0) setRate(data.hourlyRate);
+      .then((data: { ivaRate?: number; categories: QuoteCategory[] }) => {
+        if (!Array.isArray(data.categories) || !data.categories.length) throw new Error("catálogo vacío");
+        setCategories(data.categories);
         if (typeof data.ivaRate === "number" && data.ivaRate >= 0 && data.ivaRate < 1) setIvaRate(data.ivaRate);
+        setPrices("ready");
       })
       .catch(() => {
-        // Sin API se usa el catálogo incluido en el sitio.
+        // Sin API se muestran los módulos sin precios; los precios solo vienen del backend.
+        if (!controller.signal.aborted) setPrices("error");
       });
     return () => controller.abort();
   }, []);
@@ -50,7 +53,7 @@ export function Quote() {
   const known = useMemo(() => new Set(categories.flatMap((c) => c.modules.map((m) => m.id))), [categories]);
   const ids = useMemo(() => [...selected].filter((id) => known.has(id)), [selected, known]);
   const ivaPercent = Math.round(ivaRate * 100);
-  const quote = useMemo(() => computeQuoteFor(categories, ids, rate, ivaRate), [categories, ids, rate, ivaRate]);
+  const quote = useMemo(() => computeQuoteFor(categories, ids, ivaRate), [categories, ids, ivaRate]);
 
   const toggle = (id: string) =>
     setSelected((current) => {
@@ -102,7 +105,7 @@ export function Quote() {
   }
 
   const mailto = `mailto:${siteConfig.contactEmail}?subject=${encodeURIComponent("Cotización DevDul")}&body=${encodeURIComponent(
-    [...quote.items.map((i) => `- [${i.category.toUpperCase()}] ${i.name} (${i.hours} h)`), "", `Subtotal: ${mxn(quote.subtotalMxn)}`, `IVA (${ivaPercent}%): ${mxn(quote.ivaMxn)}`, `Total con IVA: ${mxn(quote.totalMxn)}`].join("\n"),
+    [...quote.items.map((i) => `- [${i.category.toUpperCase()}] ${i.name}`), ...(quote.totalMxn === null ? [] : ["", `Subtotal: ${mxn(quote.subtotalMxn!)}`, `IVA (${ivaPercent}%): ${mxn(quote.ivaMxn!)}`, `Total con IVA: ${mxn(quote.totalMxn)}`])].join("\n"),
   )}`;
 
   return (
@@ -119,7 +122,7 @@ export function Quote() {
               Arma tu sistema <span className="text-brand-400">y conoce el precio.</span>
             </>
           }
-          description={`Elige el tipo de sistema, marca los módulos que necesitas y ve el costo estimado al momento. Calculamos las horas de cada módulo a ${mxn(rate)} por hora más IVA.`}
+          description={`Elige el tipo de sistema, marca los módulos que necesitas y ve el costo estimado al momento. Los precios por módulo no incluyen IVA.`}
         />
 
         <div className="mt-14 grid gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
@@ -200,13 +203,15 @@ export function Quote() {
                                   <span className="flex items-start justify-between gap-3">
                                     <span className="text-sm font-semibold text-white">{module.name}</span>
                                     <span className="shrink-0 text-sm font-semibold tabular-nums text-brand-300">
-                                      {mxn(module.hours * rate)}
+                                      {price(module.priceMxn ?? null)}
                                     </span>
                                   </span>
                                   <span className="mt-1 block text-xs leading-5 text-slate-400">{module.description}</span>
-                                  <span className="mt-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
-                                    {module.hours} horas{module.required ? " · se incluye al elegir módulos" : ""}
-                                  </span>
+                                  {module.required ? (
+                                    <span className="mt-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+                                      Se incluye al elegir módulos
+                                    </span>
+                                  ) : null}
                                 </span>
                               </label>
                             </li>
@@ -224,24 +229,33 @@ export function Quote() {
             <div className="rounded-3xl border border-brand-400/30 bg-gradient-to-b from-brand-950/80 to-panel p-6 shadow-[0_40px_120px_-50px_rgba(43,123,255,0.8)]">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-brand-400">Tu cotización</p>
               <p className="mt-4 text-4xl font-semibold tabular-nums tracking-[-0.04em] text-white" aria-live="polite">
-                {mxn(quote.totalMxn)}
+                {price(quote.totalMxn)}
               </p>
               <p className="mt-1 text-sm text-slate-400">Total con IVA · MXN</p>
+              {prices === "error" ? (
+                <p className="mt-3 text-sm text-amber-300">
+                  No pudimos cargar los precios en este momento. Marca los módulos y{" "}
+                  <a href={mailto} className="underline">
+                    envíanos tu selección por correo
+                  </a>
+                  .
+                </p>
+              ) : null}
 
               <dl className="mt-5 space-y-1.5 rounded-2xl border border-white/[.08] bg-night/40 p-4 text-sm">
                 <div className="flex justify-between gap-3">
                   <dt className="text-slate-400">
-                    Subtotal <span className="text-slate-500">({quote.totalHours} h × {mxn(rate)})</span>
+                    Subtotal
                   </dt>
-                  <dd className="tabular-nums text-slate-200">{mxn(quote.subtotalMxn)}</dd>
+                  <dd className="tabular-nums text-slate-200">{price(quote.subtotalMxn)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-slate-400">IVA {ivaPercent}%</dt>
-                  <dd className="tabular-nums text-slate-200">{mxn(quote.ivaMxn)}</dd>
+                  <dd className="tabular-nums text-slate-200">{price(quote.ivaMxn)}</dd>
                 </div>
                 <div className="flex justify-between gap-3 border-t border-white/[.08] pt-1.5 font-semibold">
                   <dt className="text-white">Total</dt>
-                  <dd className="tabular-nums text-white">{mxn(quote.totalMxn)}</dd>
+                  <dd className="tabular-nums text-white">{price(quote.totalMxn)}</dd>
                 </div>
               </dl>
 
@@ -255,7 +269,7 @@ export function Quote() {
                         </span>
                         {item.name}
                       </span>
-                      <span className="shrink-0 tabular-nums text-slate-400">{mxn(item.amountMxn)}</span>
+                      <span className="shrink-0 tabular-nums text-slate-400">{price(item.amountMxn)}</span>
                     </li>
                   ))}
                 </ul>
@@ -303,7 +317,7 @@ export function Quote() {
               ) : (
                 <button
                   type="button"
-                  disabled={!quote.items.length}
+                  disabled={!quote.items.length || prices !== "ready"}
                   onClick={() => setFormOpen(true)}
                   className="group mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_35px_-12px_rgba(43,123,255,0.9)] transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none"
                 >
@@ -336,16 +350,16 @@ export function Quote() {
           className="fixed inset-x-4 bottom-4 z-40 flex items-center justify-between rounded-2xl border border-brand-400/40 bg-[#070f1e]/95 px-5 py-3 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl lg:hidden"
         >
           <span className="text-xs text-slate-400">
-            {quote.items.length} módulos · {quote.totalHours} h · con IVA
+            {quote.items.length} módulos · con IVA
           </span>
-          <span className="text-lg font-semibold tabular-nums text-white">{mxn(quote.totalMxn)}</span>
+          <span className="text-lg font-semibold tabular-nums text-white">{price(quote.totalMxn)}</span>
         </a>
       ) : null}
     </section>
   );
 }
 
-function computeQuoteFor(categories: QuoteCategory[], ids: string[], rate: number, ivaRate: number) {
+function computeQuoteFor(categories: QuoteCategory[], ids: string[], ivaRate: number) {
   // Misma regla que el backend: el núcleo de una categoría entra cuando se elige algún módulo de ella.
   const byId = new Map(categories.flatMap((c) => c.modules.map((m) => [m.id, c.id] as const)));
   const active = new Set(ids.map((id) => byId.get(id)));
@@ -355,12 +369,15 @@ function computeQuoteFor(categories: QuoteCategory[], ids: string[], rate: numbe
     .flatMap((c) =>
       c.modules
         .filter((m) => m.required || chosen.has(m.id))
-        .map((m) => ({ id: m.id, category: c.id, name: m.name, hours: m.hours, amountMxn: m.hours * rate })),
+        .map((m) => ({ id: m.id, category: c.id, name: m.name, amountMxn: m.priceMxn ?? null })),
     );
-  const totalHours = items.reduce((sum, item) => sum + item.hours, 0);
-  const subtotalMxn = totalHours * rate;
+  // Sin precios de la API no se muestra ningún monto.
+  if (items.some((item) => item.amountMxn === null)) {
+    return { items, subtotalMxn: null, ivaMxn: null, totalMxn: null };
+  }
+  const subtotalMxn = items.reduce((sum, item) => sum + (item.amountMxn ?? 0), 0);
   const ivaMxn = Math.round(subtotalMxn * ivaRate);
-  return { items, totalHours, hourlyRate: rate, subtotalMxn, ivaRate, ivaMxn, totalMxn: subtotalMxn + ivaMxn };
+  return { items, subtotalMxn, ivaMxn, totalMxn: subtotalMxn + ivaMxn };
 }
 
 function Field({ label, ...props }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
