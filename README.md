@@ -50,6 +50,15 @@ Todas tienen un valor por defecto, así que el sitio compila aunque no las defin
 > El proyecto no usa funciones exclusivas de Vercel, por lo que también puede desplegarse en otros
 > proveedores compatibles con Next.js (por ejemplo Cloudflare con OpenNext) si se decide más adelante.
 
+## SEO e imagen al compartir
+
+- Metadatos (título, descripción, palabras clave, canonical, Open Graph y Twitter) en `app/layout.tsx`, con los textos en `lib/site.ts`.
+- Datos estructurados (schema.org `Organization`, `ProfessionalService`, `WebSite`) en `components/JsonLd.tsx`.
+- La imagen que aparece al compartir el link es `app/opengraph-image.png` (1200x630) y `app/twitter-image.png`.
+  Para cambiarla, reemplaza ambos PNG con el mismo tamaño.
+- **Importante:** define `NEXT_PUBLIC_SITE_URL` con el dominio real (sin `/` al final) en Cloudflare Pages,
+  porque las redes sociales necesitan la URL absoluta de la imagen.
+
 ## Estructura
 
 ```
