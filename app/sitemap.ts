@@ -4,5 +4,13 @@ import { siteConfig } from "@/lib/site";
 export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [{ url: siteConfig.url, lastModified: new Date(), priority: 1 }];
+  return [
+    {
+      url: `${siteConfig.url}/`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 1,
+      images: [`${siteConfig.url}/opengraph-image.png`],
+    },
+  ];
 }
