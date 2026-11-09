@@ -27,4 +27,5 @@ export const siteConfig = {
     { name: "Aplicaciones web y móviles", description: "Apps rápidas, seguras y escalables hechas a la medida de tu negocio." },
     { name: "Integración de Inteligencia Artificial", description: "Copilotos, automatización y análisis con IA dentro de tus sistemas." },
   ],
+  apiUrl: (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787").replace(/\/$/, ""),
 };
